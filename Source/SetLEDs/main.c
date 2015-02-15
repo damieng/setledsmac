@@ -6,12 +6,12 @@
 #include "main.h"
 
 Boolean verbose = false;
-Boolean debug = false;
-const int maxLEDs = kHIDUsage_LED_ScrollLock + 1;
+const char * nameMatch;
 
 int main(int argc, const char * argv[])
 {
     parseOptions(argc, argv);
+    printf("\n");
     return 0;
 }
 
@@ -22,74 +22,58 @@ void parseOptions(int argc, const char * argv[])
         exit(1);
     }
     
-    int changeLEDs[maxLEDs] = { 0 };
+    LedState changes[] = { NoChange, NoChange, NoChange, NoChange };
+    
+    Boolean nextIsName = false;
     
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-v") == 0)
+        if (strcasecmp(argv[i], "-v") == 0)
             verbose = true;
-        else if (strcmp(argv[i], "-debug") == 0)
-            debug = true;
-        else if (strcmp(argv[i], "+num") == 0)
-            changeLEDs[kHIDUsage_LED_NumLock] = 1;
-        else if (strcmp(argv[i], "-num") == 0)
-            changeLEDs[kHIDUsage_LED_NumLock] = -1;
-        else if (strcmp(argv[i], "+caps") == 0)
-            changeLEDs[kHIDUsage_LED_CapsLock] = 1;
-        else if (strcmp(argv[i], "-caps") == 0)
-            changeLEDs[kHIDUsage_LED_CapsLock] = -1;
-        else if (strcmp(argv[i], "+scroll") == 0)
-            changeLEDs[kHIDUsage_LED_ScrollLock] = 1;
-        else if (strcmp(argv[i], "-scroll") == 0)
-            changeLEDs[kHIDUsage_LED_ScrollLock] = -1;
+        else if(strcasecmp(argv[i], "-name") == 0)
+            nextIsName = true;
+        
+        // Numeric lock
+        else if (strcasecmp(argv[i], "+num") == 0)
+            changes[kHIDUsage_LED_NumLock] = On;
+        else if (strcasecmp(argv[i], "-num") == 0)
+            changes[kHIDUsage_LED_NumLock] = Off;
+        
+        // Caps lock
+        else if (strcasecmp(argv[i], "+caps") == 0)
+            changes[kHIDUsage_LED_CapsLock] = On;
+        else if (strcasecmp(argv[i], "-caps") == 0)
+            changes[kHIDUsage_LED_CapsLock] = Off;
+        
+        // Scroll lock
+        else if (strcasecmp(argv[i], "+scroll") == 0)
+            changes[kHIDUsage_LED_ScrollLock] = On;
+        else if (strcasecmp(argv[i], "-scroll") == 0)
+            changes[kHIDUsage_LED_ScrollLock] = Off;
+
         else {
-            fprintf(stderr, "Unknown option %s\n\n", argv[i]);
-            explainUsage();
-            exit(1);
+            if (nextIsName) {
+                nameMatch = argv[i];
+                nextIsName = false;
+            }
+            else {
+                fprintf(stderr, "Unknown option %s\n\n", argv[i]);
+                explainUsage();
+                exit(1);
+            }
         }
     }
     
-    setAllKeyboards(changeLEDs);
+    setAllKeyboards(changes);
 }
 
 void explainUsage()
 {
-    printf("Usage:\tsetleds [-v] [[+|-][ num | caps | scroll]]\n"
+    printf("Usage:\tsetleds [-v] [-name wildcard] [[+|-][ num | caps | scroll]]\n"
            "Thus,\tsetleds +caps -num\n"
            "will set CapsLock, clear NumLock and leave ScrollLock unchanged.\n"
-           "The settings before and after the change (if any) are reported\n"
-           "when the -v option is given or when no change is requested.\n");
-}
-
-CFMutableDictionaryRef CreateDictionaryUsagePageUsage(CFStringRef key, UInt32 inUsagePage, UInt32 inUsage)
-{
-    CFMutableDictionaryRef result = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    
-    if (result) {
-        if (inUsagePage) {
-            CFNumberRef page = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &inUsagePage);
-            if (page) {
-                CFDictionarySetValue(result, key, page);
-                CFRelease(page);
-                
-                if (inUsage) {
-                    CFNumberRef usage = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &inUsage);
-                    
-                    if (usage) {
-                        CFDictionarySetValue(result, key, usage);
-                        CFRelease(usage);
-                    } else {
-                        fprintf(stderr, "CFNumberCreate(usage) failed.");
-                    }
-                }
-            } else {
-                fprintf(stderr, "CFNumberCreate(usage page) failed.");
-            }
-        }
-    } else {
-        fprintf(stderr, "CFDictionaryCreateMutable failed.");
-    }
-    
-    return result;
+           "Any leds changed are reported for each keyboard.\n"
+           "Specify -v to shows state of all leds.\n"
+           "Specify -name to match keyboard name with a wildcard\n");
 }
 
 Boolean isKeyboardDevice(struct __IOHIDDevice *device)
@@ -97,93 +81,120 @@ Boolean isKeyboardDevice(struct __IOHIDDevice *device)
     return IOHIDDeviceConformsTo(device, kHIDPage_GenericDesktop, kHIDUsage_GD_Keyboard);
 }
 
-void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionary, int changeLEDs[])
+void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionary, LedState changes[])
 {
-    CFStringRef deviceName = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductKey));
-    if (deviceName) {
-        printf("Found %s\n", CFStringGetCStringPtr(deviceName, kCFStringEncodingUTF8));
-        CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, keyboardDictionary, kIOHIDOptionsTypeNone);
-        if (elements) {
-            int before[maxLEDs] = { 0 };
-            int after[maxLEDs] = { 0 };
-            CFIndex elementCount = CFArrayGetCount(elements);
-            for (CFIndex elementIndex = 0; elementIndex < elementCount; elementIndex++) {
-                IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(elements, elementIndex);
-                if (element) {
-                    if (kHIDPage_LEDs == IOHIDElementGetUsagePage(element)) {
-                        uint32_t led = IOHIDElementGetUsage(element);
-                        if (debug) printf(" Examining usage %d\n", led);
-                        
-                        // Get current keyboard led status
-                        IOHIDValueRef oldValue = 0;
-                        IOHIDDeviceGetValue(device, element, &oldValue);
-                        long oldLEDStatus = IOHIDValueGetIntegerValue(oldValue);
-                        CFRelease(oldValue);
-                        if (debug) printf("  Before was %ld\n", oldLEDStatus);
+    CFStringRef deviceNameRef = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductKey));
+    if (!deviceNameRef) return;
+    
+    const char * deviceName = CFStringGetCStringPtr(deviceNameRef, kCFStringEncodingUTF8);
+    CFRelease(deviceNameRef);
 
-                        int newLEDStatus = changeLEDs[led] == 1 ? 1 : 0;
-                       
-                        if (led < maxLEDs) {
-                            if (oldLEDStatus > 0)
-                                before[led] = 1;
+    if (nameMatch && fnmatch(nameMatch, deviceName, 0) != 0)
+        return;
+    
+    printf("\nFound \"%s\" ", deviceName);
+    
+    CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, keyboardDictionary, kIOHIDOptionsTypeNone);
+    if (elements) {
+        for (CFIndex elementIndex = 0; elementIndex < CFArrayGetCount(elements); elementIndex++) {
+            IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(elements, elementIndex);
+            if (element && kHIDPage_LEDs == IOHIDElementGetUsagePage(element)) {
+                uint32_t led = IOHIDElementGetUsage(element);
 
-                            if (oldLEDStatus != newLEDStatus) {
-                                if (debug) printf("  Should change to %d\n", newLEDStatus);
-                                IOHIDValueRef newValue = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, element, 0, newLEDStatus);
-                                if (newValue) {
-                                    if (debug) printf("  Changing to %d\n", newLEDStatus);
-                                    after[led] = newLEDStatus;
-                                    IOReturn change = IOHIDDeviceSetValue(device, element, newValue);
-                                    if (kIOReturnSuccess != change)
-                                        printf("  Failed to change, error %ul\n", change);
-                                    CFRelease(newValue);
-                                }
-                            }
+                if (led >= maxLeds) break;
+                
+                // Get current keyboard led status
+                IOHIDValueRef currentValue = 0;
+                IOHIDDeviceGetValue(device, element, &currentValue);
+                long current = IOHIDValueGetIntegerValue(currentValue);
+                CFRelease(currentValue);
+
+                // Should we try to set the led?
+                if (changes[led] != NoChange && changes[led] != current) {
+                    IOHIDValueRef newValue = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, element, 0, changes[led]);
+                    if (newValue) {
+                        IOReturn changeResult = IOHIDDeviceSetValue(device, element, newValue);
+
+                        // Was the change successful?
+                        if (kIOReturnSuccess == changeResult) {
+                            printf("%s%s ", stateSymbol[changes[led]], ledNames[led - 1]);
                         }
+                        CFRelease(newValue);
                     }
+                } else if (verbose) {
+                    printf("%s%s ", stateSymbol[current], ledNames[led - 1]);
                 }
             }
-            CFRelease(elements);
         }
-        CFRelease(deviceName);
+        CFRelease(elements);
     }
+    
+    CFRelease(deviceName);
+    printf("\n");
 }
 
-void setAllKeyboards(int changeLEDs[])
+void setAllKeyboards(LedState changes[])
 {
     IOHIDManagerRef manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
     if (!manager) {
-        fprintf(stderr, "IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone) failed.");
+        fprintf(stderr, "Failed to create IOHID manager.\n");
         return;
     }
     
-    CFDictionaryRef keyboard = CreateDictionaryUsagePageUsage(CFSTR(kIOHIDDeviceUsageKey), kHIDPage_GenericDesktop, kHIDUsage_GD_Keyboard);
-    if (keyboard) {
-        if (debug) printf("Obtained keyboard dictionary\n");
-        CFDictionaryRef ledsDictionary = CreateDictionaryUsagePageUsage(CFSTR(kIOHIDElementUsageKey), kHIDPage_LEDs, 0);
-        if (ledsDictionary) {
-            if (debug) printf("Obtained LEDs dictionary\n");
-            IOHIDManagerOpen(manager, kIOHIDOptionsTypeNone);
-            IOHIDManagerSetDeviceMatching(manager, keyboard);
-            if (debug) printf("Manager opened and set to keyboard\n");
-            
-            CFSetRef devices = IOHIDManagerCopyDevices(manager);
-            if (devices) {
-                if (debug) printf("Manager devices copied\n");
-                CFIndex deviceCount = CFSetGetCount(devices);
-                IOHIDDeviceRef *deviceRefs = malloc(sizeof(IOHIDDeviceRef) * deviceCount);
-                if (deviceRefs) {
-                    if (debug) printf("Device references obtained\n");
-                    CFSetGetValues(devices, (const void **) deviceRefs);
-                    for (CFIndex deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
-                        if (isKeyboardDevice(deviceRefs[deviceIndex]))
-                            setKeyboard(deviceRefs[deviceIndex], keyboard, changeLEDs);
-                    free(deviceRefs);
-                }
-                CFRelease(devices);
-            }
-            CFRelease(ledsDictionary);
-        }
-        CFRelease(keyboard);
+    CFDictionaryRef keyboard = getKeyboardDictionary();
+    if (!keyboard) {
+        fprintf(stderr, "Failed to get dictionary usage page for kHIDUsage_GD_Keyboard.\n");
+        return;
     }
+        
+    IOHIDManagerOpen(manager, kIOHIDOptionsTypeNone);
+    IOHIDManagerSetDeviceMatching(manager, keyboard);
+   
+    CFSetRef devices = IOHIDManagerCopyDevices(manager);
+    if (devices) {
+        CFIndex deviceCount = CFSetGetCount(devices);
+        if (deviceCount == 0) {
+            fprintf(stderr, "Could not find any keyboard devices.\n");
+            return;
+        }
+        else {
+            // Loop through all keyboards attempting to get or display led state
+            IOHIDDeviceRef *deviceRefs = malloc(sizeof(IOHIDDeviceRef) * deviceCount);
+            if (deviceRefs) {
+                CFSetGetValues(devices, (const void **) deviceRefs);
+                for (CFIndex deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
+                    if (isKeyboardDevice(deviceRefs[deviceIndex]))
+                        setKeyboard(deviceRefs[deviceIndex], keyboard, changes);
+                
+                free(deviceRefs);
+            }
+        }
+
+        CFRelease(devices);
+    }
+
+    CFRelease(keyboard);
+}
+
+CFMutableDictionaryRef getKeyboardDictionary()
+{
+    CFMutableDictionaryRef result = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    
+    if (!result) return result;
+    
+    UInt32 inUsagePage = kHIDPage_GenericDesktop;
+    UInt32 inUsage = kHIDUsage_GD_Keyboard;
+    
+    CFNumberRef page = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &inUsagePage);
+    if (page) {
+        CFDictionarySetValue(result, CFSTR(kIOHIDDeviceUsageKey), page);
+        CFRelease(page);
+        
+        CFNumberRef usage = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &inUsage);
+        if (usage) {
+            CFDictionarySetValue(result, CFSTR(kIOHIDDeviceUsageKey), usage);
+            CFRelease(usage);
+        }
+    }
+    return result;
 }
