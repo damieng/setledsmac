@@ -10,6 +10,7 @@ const char * nameMatch;
 
 int main(int argc, const char * argv[])
 {
+    printf("SetLEDs version 0.1 - http://github.com/damieng/setledsmac\n");
     parseOptions(argc, argv);
     printf("\n");
     return 0;
@@ -92,7 +93,7 @@ void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionar
     if (nameMatch && fnmatch(nameMatch, deviceName, 0) != 0)
         return;
     
-    printf("\nFound \"%s\" ", deviceName);
+    printf("\n \"%s\" ", deviceName);
     
     CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, keyboardDictionary, kIOHIDOptionsTypeNone);
     if (elements) {
