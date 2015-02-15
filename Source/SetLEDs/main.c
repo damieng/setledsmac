@@ -88,7 +88,6 @@ void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionar
     if (!deviceNameRef) return;
     
     const char * deviceName = CFStringGetCStringPtr(deviceNameRef, kCFStringEncodingUTF8);
-    CFRelease(deviceNameRef);
 
     if (nameMatch && fnmatch(nameMatch, deviceName, 0) != 0)
         return;
@@ -130,7 +129,6 @@ void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionar
         CFRelease(elements);
     }
     
-    CFRelease(deviceName);
     printf("\n");
 }
 
@@ -156,7 +154,6 @@ void setAllKeyboards(LedState changes[])
         CFIndex deviceCount = CFSetGetCount(devices);
         if (deviceCount == 0) {
             fprintf(stderr, "Could not find any keyboard devices.\n");
-            return;
         }
         else {
             // Loop through all keyboards attempting to get or display led state
