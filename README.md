@@ -23,7 +23,3 @@ setleds +scroll -name "Apple Key*"
 setledsmac will report what keys it changed for each keyboard. This is sometimes different per keyboard if either the keyboard does not have that modifier (e.g. Apple keyboards do not have scroll lock) or if the keyboard already had that LED on.
 
 Specifying -v on the command line will cause setledsmac to report the state of the other unchanged modifier keys on that keyboard too. Note that you will not see the state of modifiers that keyboard does not have.
-
-
-
-* -v for verbose mode which will cause the output to show the final LED state of each keyboard.
