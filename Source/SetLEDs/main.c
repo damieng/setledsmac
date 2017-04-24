@@ -101,7 +101,7 @@ void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionar
             if (element && kHIDPage_LEDs == IOHIDElementGetUsagePage(element)) {
                 uint32_t led = IOHIDElementGetUsage(element);
 
-                if (led >= maxLeds) break;
+                if (led > maxLeds) break;
                 
                 // Get current keyboard led status
                 IOHIDValueRef currentValue = 0;
