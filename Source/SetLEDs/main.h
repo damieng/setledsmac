@@ -17,8 +17,8 @@ const char* stateSymbol[] = {"-", "+" };
 typedef enum { NoChange = -1, Off, On } LedState;
 
 void parseOptions(int argc, const char * argv[]);
-void explainUsage();
+void explainUsage(void);
 void setAllKeyboards(LedState changes[]);
-CFMutableDictionaryRef getKeyboardDictionary();
+CFMutableDictionaryRef getKeyboardDictionary(void);
 
 #endif
