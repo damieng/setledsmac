@@ -6,10 +6,10 @@ This command-line tool lets you set your keyboard LEDs. This is especially usefu
 Setting the LED on or off does not affect the behavior of that key so even though the led for caps lock will be on caps lock itself will still be off. Tapping the key will cause the lock to come on but the LED will already be on so it will not appear to change. Tapping it again will turn it off (and cause the LED to turn off).
 
 ## Usage
-You can set LEDs by simply specifing either a - to turn an LED off or a + to turn an LED on followed by either the word scroll (for scroll lock), num (for numeric lock) or caps (for caps lock). e.g.
+You can set LEDs by simply specifing either a - to turn an LED off, a + to turn an LED on or a ^ to toggle an LED followed by either the word scroll (for scroll lock), num (for numeric lock) or caps (for caps lock). e.g.
 
 ```bash
-setleds -caps +scroll
+setleds -caps +scroll ^num
 ```
 
 ### Name matching
