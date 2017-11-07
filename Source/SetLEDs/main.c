@@ -1,5 +1,5 @@
 /*  setleds for Mac
-    http://github.com/damieng/setledsmac
+    https://github.com/damieng/setledsmac
     Copyright 2015-2017 Damien Guard. GPL 2 licenced.
  */
 
@@ -10,7 +10,7 @@ const char * nameMatch;
 
 int main(int argc, const char * argv[])
 {
-    printf("SetLEDs version 0.2 - http://github.com/damieng/setledsmac\n");
+    printf("SetLEDs version 0.2 - https://github.com/damieng/setledsmac\n");
     parseOptions(argc, argv);
     printf("\n");
     return 0;
