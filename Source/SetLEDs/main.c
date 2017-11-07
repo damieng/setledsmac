@@ -75,7 +75,7 @@ void parseOptions(int argc, const char * argv[])
 
 void explainUsage()
 {
-    printf("Usage:\tsetleds [-v] [-name wildcard] [[+|-][ num | caps | scroll]]\n"
+    printf("Usage:\tsetleds [-v] [-name wildcard] [[+|-|^][ num | caps | scroll]]\n"
            "Thus,\tsetleds +caps -num ^scroll\n"
            "will set CapsLock, clear NumLock and toggle ScrollLock.\n"
            "Any leds changed are reported for each keyboard.\n"
