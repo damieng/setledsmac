@@ -14,7 +14,7 @@
 const int maxLeds = 3;
 const char* ledNames[] = { "num", "caps", "scroll" };
 const char* stateSymbol[] = {"-", "+" };
-typedef enum { NoChange = -1, Off, On } LedState;
+typedef enum { NoChange = -1, Off, On, Toggle } LedState;
 
 void parseOptions(int argc, const char * argv[]);
 void explainUsage(void);

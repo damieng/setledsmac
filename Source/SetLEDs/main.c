@@ -38,18 +38,24 @@ void parseOptions(int argc, const char * argv[])
             changes[kHIDUsage_LED_NumLock] = On;
         else if (strcasecmp(argv[i], "-num") == 0)
             changes[kHIDUsage_LED_NumLock] = Off;
-        
+        else if (strcasecmp(argv[i], "^num") == 0)
+            changes[kHIDUsage_LED_NumLock] = Toggle;
+
         // Caps lock
         else if (strcasecmp(argv[i], "+caps") == 0)
             changes[kHIDUsage_LED_CapsLock] = On;
         else if (strcasecmp(argv[i], "-caps") == 0)
             changes[kHIDUsage_LED_CapsLock] = Off;
-        
+        else if (strcasecmp(argv[i], "^caps") == 0)
+            changes[kHIDUsage_LED_CapsLock] = Toggle;
+
         // Scroll lock
         else if (strcasecmp(argv[i], "+scroll") == 0)
             changes[kHIDUsage_LED_ScrollLock] = On;
         else if (strcasecmp(argv[i], "-scroll") == 0)
             changes[kHIDUsage_LED_ScrollLock] = Off;
+        else if (strcasecmp(argv[i], "^scroll") == 0)
+            changes[kHIDUsage_LED_ScrollLock] = Toggle;
 
         else {
             if (nextIsName) {
@@ -70,8 +76,8 @@ void parseOptions(int argc, const char * argv[])
 void explainUsage()
 {
     printf("Usage:\tsetleds [-v] [-name wildcard] [[+|-][ num | caps | scroll]]\n"
-           "Thus,\tsetleds +caps -num\n"
-           "will set CapsLock, clear NumLock and leave ScrollLock unchanged.\n"
+           "Thus,\tsetleds +caps -num ^scroll\n"
+           "will set CapsLock, clear NumLock and toggle ScrollLock.\n"
            "Any leds changed are reported for each keyboard.\n"
            "Specify -v to shows state of all leds.\n"
            "Specify -name to match keyboard name with a wildcard\n");
@@ -118,13 +124,17 @@ void setKeyboard(IOHIDDeviceRef device, CFDictionaryRef keyboardDictionary, LedS
 
                     // Should we try to set the led?
                     if (changes[led] != NoChange && changes[led] != current) {
-                        IOHIDValueRef newValue = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, element, 0, changes[led]);
+                        LedState newState = changes[led];
+                        if (newState == Toggle) {
+                            newState = current == 0 ? On : Off;
+                        }
+                        IOHIDValueRef newValue = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, element, 0, newState);
                         if (newValue) {
                             IOReturn changeResult = IOHIDDeviceSetValue(device, element, newValue);
 
                             // Was the change successful?
                             if (kIOReturnSuccess == changeResult) {
-                                printf("%s%s ", stateSymbol[changes[led]], ledNames[led - 1]);
+                                printf("%s%s ", stateSymbol[newState], ledNames[led - 1]);
                             }
                             CFRelease(newValue);
                         }
