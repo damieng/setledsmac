@@ -1,6 +1,6 @@
 /*  setleds for Mac
     http://github.com/damieng/setledsmac
-    Copyright 2015 Damien Guard. GPL 2 licenced.
+    Copyright 2015-2017 Damien Guard. GPL 2 licenced.
  */
 
 #include "main.h"
@@ -10,7 +10,7 @@ const char * nameMatch;
 
 int main(int argc, const char * argv[])
 {
-    printf("SetLEDs version 0.1 - http://github.com/damieng/setledsmac\n");
+    printf("SetLEDs version 0.2 - http://github.com/damieng/setledsmac\n");
     parseOptions(argc, argv);
     printf("\n");
     return 0;
@@ -77,12 +77,12 @@ void explainUsage()
            "Specify -name to match keyboard name with a wildcard\n");
 }
 
-Boolean isKeyboardDevice(struct __IOHIDDevice *device)
+Boolean isKeyboardDevice(IOHIDDeviceRef device)
 {
     return IOHIDDeviceConformsTo(device, kHIDPage_GenericDesktop, kHIDUsage_GD_Keyboard);
 }
 
-void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionary, LedState changes[])
+void setKeyboard(IOHIDDeviceRef device, CFDictionaryRef keyboardDictionary, LedState changes[])
 {
     CFStringRef deviceNameRef = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductKey));
     if (!deviceNameRef) return;
@@ -95,9 +95,11 @@ void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionar
     printf("\n \"%s\" ", deviceName);
     
     CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, keyboardDictionary, kIOHIDOptionsTypeNone);
+    bool missingState = false;
     if (elements) {
         for (CFIndex elementIndex = 0; elementIndex < CFArrayGetCount(elements); elementIndex++) {
             IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(elements, elementIndex);
+
             if (element && kHIDPage_LEDs == IOHIDElementGetUsagePage(element)) {
                 uint32_t led = IOHIDElementGetUsage(element);
 
@@ -106,23 +108,29 @@ void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionar
                 // Get current keyboard led status
                 IOHIDValueRef currentValue = 0;
                 IOHIDDeviceGetValue(device, element, &currentValue);
-                long current = IOHIDValueGetIntegerValue(currentValue);
-                CFRelease(currentValue);
 
-                // Should we try to set the led?
-                if (changes[led] != NoChange && changes[led] != current) {
-                    IOHIDValueRef newValue = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, element, 0, changes[led]);
-                    if (newValue) {
-                        IOReturn changeResult = IOHIDDeviceSetValue(device, element, newValue);
+                if (currentValue == 0x00) {
+                    missingState = true;
+                    printf("?%s ", ledNames[led - 1]);
+                } else {
+                    long current = IOHIDValueGetIntegerValue(currentValue);
+                    CFRelease(currentValue);
 
-                        // Was the change successful?
-                        if (kIOReturnSuccess == changeResult) {
-                            printf("%s%s ", stateSymbol[changes[led]], ledNames[led - 1]);
+                    // Should we try to set the led?
+                    if (changes[led] != NoChange && changes[led] != current) {
+                        IOHIDValueRef newValue = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, element, 0, changes[led]);
+                        if (newValue) {
+                            IOReturn changeResult = IOHIDDeviceSetValue(device, element, newValue);
+
+                            // Was the change successful?
+                            if (kIOReturnSuccess == changeResult) {
+                                printf("%s%s ", stateSymbol[changes[led]], ledNames[led - 1]);
+                            }
+                            CFRelease(newValue);
                         }
-                        CFRelease(newValue);
+                    } else if (verbose) {
+                        printf("%s%s ", stateSymbol[current], ledNames[led - 1]);
                     }
-                } else if (verbose) {
-                    printf("%s%s ", stateSymbol[current], ledNames[led - 1]);
                 }
             }
         }
@@ -130,6 +138,9 @@ void setKeyboard(struct __IOHIDDevice *device, CFDictionaryRef keyboardDictionar
     }
     
     printf("\n");
+    if (missingState) {
+        printf("\nSome state could not be determined. Please try running as root/sudo.\n");
+    }
 }
 
 void setAllKeyboards(LedState changes[])
