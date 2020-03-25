@@ -1,5 +1,5 @@
-setleds :
-	gcc -o setleds main.c -framework Foundation -framework IOKit
+setleds: main.c main.h
+	$(CC) -o $@ $< -framework Foundation -framework IOKit
 
 clean :
 	rm -f setleds
