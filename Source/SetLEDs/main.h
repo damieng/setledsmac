@@ -1,15 +1,12 @@
 /*  setleds for Mac
-    http://github.com/damieng/setledsmac
-    Copyright 2015 Damien Guard. GPL 2 licenced.
+    https://github.com/damieng/setledsmac
+    Copyright 2015-2024 Damien Guard. GPL 2 licenced.
  */
 
 #ifndef SetLEDs_main_h
 #define SetLEDs_main_h
 
 #include <CoreFoundation/CoreFoundation.h>
-#include <Carbon/Carbon.h>
-#include <IOKit/hid/IOHIDLib.h>
-#include <fnmatch.h>
 
 const int maxLeds = 3;
 const char* ledNames[] = { "num", "caps", "scroll" };

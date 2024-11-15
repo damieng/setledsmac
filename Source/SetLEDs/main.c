@@ -1,16 +1,20 @@
 /*  setleds for Mac
     https://github.com/damieng/setledsmac
-    Copyright 2015-2017 Damien Guard. GPL 2 licenced.
+    Copyright 2015-2024 Damien Guard. GPL 2 licenced.
  */
 
 #include "main.h"
+#include <fnmatch.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <IOKit/hid/IOHIDLib.h>
 
-Boolean verbose = false;
+bool verbose = false;
 const char * nameMatch;
 
 int main(int argc, const char * argv[])
 {
-    printf("SetLEDs version 0.2 - https://github.com/damieng/setledsmac\n");
+    printf("SetLEDs version 0.3 - https://github.com/damieng/setledsmac\n");
     parseOptions(argc, argv);
     printf("\n");
     return 0;
@@ -25,7 +29,7 @@ void parseOptions(int argc, const char * argv[])
     
     LedState changes[] = { NoChange, NoChange, NoChange, NoChange };
     
-    Boolean nextIsName = false;
+    bool nextIsName = false;
     
     for (int i = 1; i < argc; i++) {
         if (strcasecmp(argv[i], "-v") == 0)
@@ -73,7 +77,7 @@ void parseOptions(int argc, const char * argv[])
     setAllKeyboards(changes);
 }
 
-void explainUsage()
+void explainUsage(void)
 {
     printf("Usage:\tsetleds [-v] [-name wildcard] [[+|-|^][ num | caps | scroll]]\n"
            "Thus,\tsetleds +caps -num ^scroll\n"
@@ -94,22 +98,28 @@ void setKeyboard(IOHIDDeviceRef device, CFDictionaryRef keyboardDictionary, LedS
     if (!deviceNameRef) return;
     
     const char * deviceName = CFStringGetCStringPtr(deviceNameRef, kCFStringEncodingUTF8);
-
+    
     if (nameMatch && fnmatch(nameMatch, deviceName, 0) != 0)
         return;
-    
-    printf("\n \"%s\" ", deviceName);
-    
+        
     CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, keyboardDictionary, kIOHIDOptionsTypeNone);
     bool missingState = false;
+        
     if (elements) {
-        for (CFIndex elementIndex = 0; elementIndex < CFArrayGetCount(elements); elementIndex++) {
+        long elementCount = CFArrayGetCount(elements);
+        bool printedName = false;
+        for (CFIndex elementIndex = 0; elementIndex < elementCount; elementIndex++) {
             IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(elements, elementIndex);
 
             if (element && kHIDPage_LEDs == IOHIDElementGetUsagePage(element)) {
                 uint32_t led = IOHIDElementGetUsage(element);
 
                 if (led > maxLeds) break;
+                
+                if (!printedName) {
+                    printf("\n \"%s\" ", deviceName);
+                    printedName = true;
+                }
                 
                 // Get current keyboard led status
                 IOHIDValueRef currentValue = 0;
@@ -195,7 +205,7 @@ void setAllKeyboards(LedState changes[])
     CFRelease(keyboard);
 }
 
-CFMutableDictionaryRef getKeyboardDictionary()
+CFMutableDictionaryRef getKeyboardDictionary(void)
 {
     CFMutableDictionaryRef result = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     
